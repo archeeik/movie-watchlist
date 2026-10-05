@@ -1,0 +1,12 @@
+# 개인 기록(하트·내 별점) — 공개 저장소에 올리지 않는다
+data/mine.json
+# 키·비밀 값은 파일로 두지 않고 GitHub Actions Secrets에 넣는다
+.env
+.env.*
+__pycache__/
+*.pyc
+.claude/
+# 원본 아티팩트(포스터 base64 포함)는 로컬 참고용
+current-artifact.html
+# 인계 문서(수집 방법 설명 포함)는 공개 저장소에 올리지 않는다
+CLAUDE.md

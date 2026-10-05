@@ -1,0 +1,41 @@
+name: 배포 (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "data/**", ".github/workflows/deploy.yml"]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main   # 수집 작업이 방금 올린 커밋까지 포함
+      - name: 사이트 묶기 (web → /, data → /data)
+        run: |
+          mkdir -p _site/data
+          cp -r web/. _site/
+          cp data/films.json data/status.json data/showtimes.json _site/data/
+          # 앱 파일이 바뀔 때마다 서비스 워커 저장소 이름도 바뀌게 한다
+          sed -i "s/movies-v1/movies-${GITHUB_SHA::8}/" _site/sw.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

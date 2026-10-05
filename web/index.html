@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="보고싶은 영화">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>보고싶은 영화</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>보고싶은 영화</h1>
+  <p class="sub">씨네21 전문가 별점 6.00 이상, 2026년 개봉작</p>
+  <div class="meta" id="meta"></div>
+  <div class="seg" role="group" aria-label="정렬">
+    <button data-s="new" aria-pressed="true">최신순</button>
+    <button data-s="score" aria-pressed="false">평점순</button>
+    <button data-s="old" aria-pressed="false">개봉일순</button>
+  </div>
+  <div class="seg" role="group" aria-label="상영 상태">
+    <button data-f="all" aria-pressed="true">전체</button>
+    <button data-f="on" aria-pressed="false">상영중</button>
+    <button data-f="off" aria-pressed="false">종영</button>
+    <button data-f="soon" aria-pressed="false">개봉예정</button>
+  </div>
+  <div id="now"></div>
+  <div id="sections"><div class="group"><div class="empty"><span class="spin"></span>불러오는 중입니다</div></div></div>
+  <div class="foot">
+    <p>상영 정보는 영화관입장권통합전산망(KOBIS) 일별 박스오피스의 스크린 수입니다. 최근 8일 중 마지막 날에 상영 기록이 있으면 상영중, 그 전에만 있으면 간헐 상영으로 표시합니다.</p>
+    <p>OTT는 넷플릭스와 왓챠만 표시합니다. 왓챠는 왓챠 검색으로 구독과 개별구매를 구분하고, 넷플릭스는 JustWatch 기준입니다. 단품 가격은 알 때만 표시합니다.</p>
+    <p>포스터·별점·작품 정보: 씨네21. 제목을 누르면 네이버 영화검색이 열립니다.</p>
+    <p>하트와 내 별점은 이 기기의 브라우저에만 저장됩니다. 다른 기기로 옮기려면 내보낸 파일을 그 기기에서 가져오세요.
+      <button class="linkbtn" id="mineExport">내 기록 내보내기</button> ·
+      <button class="linkbtn" id="mineImport">가져오기</button>
+      <input type="file" id="mineFile" accept="application/json,.json" hidden></p>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
