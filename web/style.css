@@ -141,3 +141,6 @@ a.tag.buy:focus-visible{outline:2px solid var(--pink);outline-offset:1px}
 .meta .stale{color:var(--orange);font-weight:600}
 .foot .backup{font-size:12px;color:var(--label3)}
 .foot .backup .linkbtn{color:var(--label2)}
+.seg.years{margin:26px 0 -8px}
+.seg.years[hidden]{display:none}
+.seg.years button{font-size:15px;font-weight:600;padding:7px 4px;font-variant-numeric:tabular-nums}

@@ -9,7 +9,7 @@ let NOW={days:{}};                  // data/showtimes.json
 let MINE={st:{},rt:{},ts:{}};
 try{ const s=JSON.parse(localStorage.getItem("mine")||"null"); if(s&&s.st) MINE={st:s.st,rt:s.rt||{},ts:s.ts||{},at:s.at||0}; }catch(e){}
 const STAR_ROW=(cls)=>`<svg class="${cls}" viewBox="0 0 110 22" aria-hidden="true">${[0,1,2,3,4].map(i=>`<path transform="translate(${i*22} 0)" d="M11 1.8l2.7 5.6 6.1.9-4.4 4.3 1 6.1L11 15.8l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>`).join("")}</svg>`;
-let sortBy="new", filter="all", mineOnly=false, query="";
+let sortBy="new", filter="all", mineOnly=false, query="", yearSel=null;   // yearSel: 연도 탭에서 고른 개봉 연도
 try{ mineOnly=localStorage.getItem("f:mine")==="1"; }catch(e){}
 const todayStr=()=>{ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; };
 let TODAY=todayStr();   // 앱을 켜 둔 채 날짜가 바뀌면 돌아올 때 다시 정한다
@@ -124,7 +124,7 @@ document.addEventListener("click",e=>{
   const dy=e.target.closest("[data-day]"); if(dy){ nowDay=dy.dataset.day; renderNow(); return; }
   const g=e.target.closest("[data-goto]");
   if(g){ const id=g.dataset.goto; let row=document.querySelector(`.row[data-id="${id}"]`);
-    if(!row){ resetFilters(); render(); row=document.querySelector(`.row[data-id="${id}"]`); }
+    if(!row){ resetFilters(); const f=FILMS.find(x=>String(x.id)===id); if(f) yearSel=f.re?homeYear():f.d.slice(0,4); render(); row=document.querySelector(`.row[data-id="${id}"]`); }
     if(row){ const sec=row.closest(".section"); if(sec&&sec.dataset.open!=="true"){ sec.dataset.open="true"; setOpen(sec.dataset.k,"true"); applyMode(sec); }
       row.hidden=false; row.scrollIntoView({behavior:"smooth",block:"center"}); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
     return; }
@@ -143,22 +143,35 @@ function applyMode(sec){
   const hd=sec.querySelector(".sechead"); if(hd){ hd.setAttribute("aria-expanded",mode!=="false"); hd.setAttribute("aria-label",`${hd.querySelector("h2").textContent}, ${mode==="true"?"전체 보기":mode==="mine"?"보고 싶은 영화와 본 영화만 보기":"접힘"}. 누르면 다음 보기로 바뀝니다`); }
 }
 
+// 연도 탭: 목록에 있는 개봉 연도(최신부터). 새 연도의 작품이 들어오면 탭이 저절로 생긴다
+const filmYears=()=>[...new Set(FILMS.filter(f=>!f.re&&f.d).map(f=>f.d.slice(0,4)))].sort().reverse();
+// 처음 보여 줄 연도: 올해(목록에 있으면), 없으면 올해 이전의 가장 최근 연도. 재개봉·기획전은 이 연도 탭에서만 보인다
+function homeYear(){ const ys=filmYears(), cur=TODAY.slice(0,4); return ys.includes(cur)?cur:(ys.find(y=>y<=cur)||ys[0]||cur); }
+function renderYears(searching){
+  const ys=filmYears(), box=$("#years");
+  if(ys.length<2||searching){ box.hidden=true; box.innerHTML=""; return; }   // 검색할 때는 모든 연도에서 찾는다
+  box.hidden=false;
+  box.innerHTML=ys.map(y=>`<button data-y="${y}" aria-pressed="${y===yearSel}">${y}</button>`).join("");
+}
+document.addEventListener("click",e=>{ const b=e.target.closest("[data-y]"); if(!b) return; yearSel=b.dataset.y; render(); });
+
 function render(){
   const cmp={new:(a,b)=>(b.d||"").localeCompare(a.d||"")||b.s-a.s, old:(a,b)=>(a.d||"").localeCompare(b.d||"")||b.s-a.s, score:(a,b)=>b.s-a.s||(b.d||"").localeCompare(a.d||"")}[sortBy];
   const reCmp=sortBy==="score"?(a,b)=>b.s-a.s:(sortBy==="old"?(a,b)=>a.y-b.y:(a,b)=>b.y-a.y);
   const groups={};
   const qn=nz2(query);
+  if(!yearSel||!filmYears().includes(yearSel)) yearSel=homeYear();
+  const inYear=f=>qn||(f.re?yearSel===homeYear():f.d.slice(0,4)===yearSel);
+  renderYears(!!qn);
   const hit=f=>!qn||[f.t,f.q,f.dir,f.cast].some(x=>x&&nz2(x).includes(qn));
   // 재개봉·기획전은 상영이 끝난 작품을 목록에서 뺀다(데이터와 하트·별점은 남아 있어 다시 상영하면 돌아온다). 검색할 때는 모두 찾는다
-  FILMS.filter(f=>qn||!(f.re&&statusOf(f).k==="off")).filter(f=>filter==="all"||fcat(f)===filter).filter(f=>!mineOnly||MINE.st[f.id]).filter(hit)
+  FILMS.filter(inYear).filter(f=>qn||!(f.re&&statusOf(f).k==="off")).filter(f=>filter==="all"||fcat(f)===filter).filter(f=>!mineOnly||MINE.st[f.id]).filter(hit)
     .forEach(f=>(groups[groupKey(f)]=groups[groupKey(f)]||[]).push(f));
-  // 해가 쌓여도 길어지지 않게, 따로 정해 두지 않은 섹션은 최근 4개 분기만 펼친다
-  const recent4=[...new Set(FILMS.filter(f=>!f.re).map(groupKey))].sort().reverse().slice(0,4);
   let keys=Object.keys(groups).filter(k=>k!=="re").sort((a,b)=>sortBy==="old"?a.localeCompare(b):b.localeCompare(a));
   if(groups.re) keys.push("re");
   const box=$("#sections");
   if(!keys.length){box.innerHTML=`<div class="group"><div class="empty">이 조건에 맞는 영화가 없습니다. 검색어나 필터를 바꿔 보세요.</div></div>`;return;}
-  box.innerHTML=keys.map(k=>{const list=groups[k].sort(k==="re"?reCmp:cmp); const open=qn?"true":openState(k,recent4.includes(k)?"true":"false");
+  box.innerHTML=keys.map(k=>{const list=groups[k].sort(k==="re"?reCmp:cmp); const open=qn?"true":openState(k,k==="re"?"false":"true");
     return `<section class="section" data-k="${k}" data-open="${open}">
       <div class="headrow"><button class="sechead" aria-expanded="${open}"><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><h2>${groupLabel(k)}</h2><span class="modebadge">내 영화만</span><span class="cnt">${list.length}편</span></button></div>
       <ul class="group">${list.map(rowHTML).join("")}<li class="empty mine-empty" hidden>이 섹션에 보고 싶은 영화나 본 영화로 표시한 작품이 없습니다. 제목을 다시 누르면 접힙니다.</li></ul></section>`;}).join("");
