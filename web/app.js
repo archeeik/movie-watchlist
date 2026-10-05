@@ -47,7 +47,7 @@ function rowHTML(f){
   const st=statusOf(f);
   const l2=[f.dir&&("감독 "+f.dir), f.cast, f.c, f.min&&(f.min+"분")].filter(Boolean).join(" · ");
   return `<li class="row" data-id="${f.id}">
-    <div class="left">${f.p?`<img class="poster" alt="${esc(f.t)} 포스터" src="${esc(f.p)}" width="52" height="75" loading="lazy" decoding="async" referrerpolicy="no-referrer">`:`<div class="poster"></div>`}
+    <div class="left">${f.p?`<img class="poster" alt="${esc(f.t)} 포스터" src="${esc(posterURL(f.p))}" width="52" height="75" loading="lazy" decoding="async" referrerpolicy="no-referrer">`:`<div class="poster"></div>`}
       <span class="rate"><b>★</b> ${(+f.s).toFixed(2)}</span></div>
     <div class="body">
       <p class="title"><a href="${naver(f)}" target="_blank" rel="noopener">${esc(f.t)}</a></p>
@@ -61,6 +61,8 @@ function rowHTML(f){
     </div></li>`;
 }
 const naver=f=>"https://search.naver.com/search.naver?query="+encodeURIComponent("영화 "+(f.q||f.t));
+// 씨네21 포스터 주소의 크기 표시 [X104,150]를 %5B…%5D로 바꾼다(대괄호가 든 주소를 못 여는 브라우저 대비)
+function posterURL(u){ return String(u).replace(/\[/g,"%5B").replace(/\]/g,"%5D"); }
 // 포스터를 불러오지 못하면 빈 칸으로
 document.addEventListener("error",e=>{ const t=e.target; if(t&&t.tagName==="IMG"&&t.classList.contains("poster")){ const d=document.createElement("div"); d.className="poster"; t.replaceWith(d); } },true);
 
