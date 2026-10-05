@@ -95,7 +95,8 @@ def _dump(o, depth):
 
 
 def save(name, obj, depth=1):
-    (DATA / name).write_text(_dump(obj, depth) + "\n", encoding="utf-8")
+    # 줄 끝은 항상 LF — Windows에서 돌려도 GitHub에서 만든 파일과 줄 단위로 같게
+    (DATA / name).write_text(_dump(obj, depth) + "\n", encoding="utf-8", newline="\n")
 
 
 def nz(s):
