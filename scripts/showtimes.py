@@ -70,21 +70,38 @@ def cgv_days():
 def main():
     start = today()
     dates = [(start + timedelta(days=i)).isoformat() for i in range(DAYS)]
-    days, pub = {}, {}
+    old = load("showtimes.json", {})
+    days, pub, errors = {}, {}, []
+
+    def keep_old(k):
+        """조회에 실패한 극장은 이전에 받아 둔 오늘 이후 시간표를 그대로 둔다."""
+        for d, x in (old.get("days") or {}).items():
+            if d >= dates[0] and x.get(k):
+                days.setdefault(d, {})[k] = x[k]
+        if (old.get("pub") or {}).get(k):
+            pub[k] = old["pub"][k]
+
+    # 극장 하나가 실패해도 나머지는 저장하고, 끝에서 실패로 알린다
     for k, (b, c) in THEATERS.items():
-        total = 0
-        for d in dates:
-            L = day_list(b, c, d)
-            total += len(L)
-            if L:
+        try:
+            got, last, total = {}, None, 0
+            for d in dates:
+                L = day_list(b, c, d)
+                total += len(L)
+                if L:
+                    got[d] = L
+                if len(L) >= 3:
+                    last = d
+            if total == 0:
+                raise CollectError(f"{k}: {DAYS}일 동안 회차가 하나도 없음 — 극장 코드나 응답 구조 확인 필요")
+            for d, L in got.items():
                 days.setdefault(d, {})[k] = L
-            if len(L) >= 3:
-                pub[k] = d
-        log(f"{k}: {total}회차, 공개 마지막 날 {pub.get(k, '-')}")
-        if total == 0:
-            raise CollectError(f"{k}: {DAYS}일 동안 회차가 하나도 없음 — 극장 코드나 응답 구조 확인 필요")
-    # CGV 대학로가 실패해도 다른 극장 시간표는 저장하고, 끝에서 실패로 알린다
-    cgv_error = None
+            if last:
+                pub[k] = last
+            log(f"{k}: {total}회차, 공개 마지막 날 {last or '-'}")
+        except CollectError as e:
+            errors.append(f"{k}: {e}")
+            keep_old(k)
     try:
         total = 0
         for d, L in cgv_days().items():
@@ -96,15 +113,14 @@ def main():
                 pub["cgv"] = max(pub.get("cgv", ""), d)
         log(f"cgv: {total}회차, 공개 마지막 날 {pub.get('cgv', '-')}")
     except CollectError as e:
-        cgv_error = e
-    out = {"at": now_iso(), "pub": pub, "days": {d: days[d] for d in sorted(days)}}
-    old = load("showtimes.json", {})
-    if old.get("pub") == out["pub"] and old.get("days") == out["days"]:
-        log("시간표 변동 없음(갱신 시각만 바꿈)")
+        errors.append(f"cgv: {e}")
+        keep_old("cgv")
+
+    out = {"at": old.get("at") if len(errors) == len(THEATERS) + 1 else now_iso(), "pub": pub, "days": {d: days[d] for d in sorted(days)}}
     save("showtimes.json", out, depth=2)
     log(f"저장: {len(days)}일")
-    if cgv_error:
-        raise cgv_error
+    if errors:
+        raise CollectError(" / ".join(errors))
 
 
 if __name__ == "__main__":
