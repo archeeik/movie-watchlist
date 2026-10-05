@@ -10,3 +10,5 @@ __pycache__/
 current-artifact.html
 # 인계 문서(수집 방법 설명 포함)는 공개 저장소에 올리지 않는다
 CLAUDE.md
+# PC에서 돌리는 왓챠 수집 기록
+logs/

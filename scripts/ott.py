@@ -2,6 +2,11 @@
 
     python scripts/ott.py          # 개봉 6개월 이내는 매번, 그 이전(재개봉·기획전 포함)은 격주(ISO 주 번호가 짝수인 주)
     python scripts/ott.py --all    # 전부 조회
+    python scripts/ott.py --netflix-only   # 넷플릭스만(왓챠 값은 그대로) — GitHub Actions용
+    python scripts/ott.py --watcha-only    # 왓챠만(넷플릭스 값은 그대로) — 국내 PC용
+
+왓챠는 해외 IP를 HTTP 451로 막아서 GitHub Actions에서는 조회할 수 없다. 그래서 Actions는 넷플릭스만,
+왓챠는 PC의 작업 스케줄러(scripts/watcha_local.py)가 맡는다.
 
 동명 영화가 많아 감독·제작연도로 거른다. 걸러낸 것과 보조 판정은 로그에 남겨 사람이 확인할 수 있게 한다.
 """
@@ -122,14 +127,20 @@ def main():
     recent = lambda f: bool(f.get("d")) and (f["d"] + "-31")[:10] >= cutoff
     old_turn = "--all" in sys.argv or today().isocalendar().week % 2 == 0
     targets = [f for f in released if old_turn or recent(f)]
+    do_nfx, do_wat = "--watcha-only" not in sys.argv, "--netflix-only" not in sys.argv
+    if "--limit" in sys.argv:   # 시험용: 앞의 N편만
+        targets = targets[:int(sys.argv[sys.argv.index("--limit") + 1])]
     log(f"조회 대상 {len(targets)}편(개봉 6개월 이내 {sum(1 for f in released if recent(f))}편"
         + (f", 그 이전 {sum(1 for f in released if not recent(f))}편 포함)" if old_turn else ", 그 이전 작품은 이번 주 쉼)"))
-    nfx = netflix(targets)
+    nfx = netflix(targets) if do_nfx else {f["id"] for f in targets if old.get(str(f["id"]), {}).get("n")}
     new, errors = {}, 0
     for f in targets:
         k = str(f["id"])
         try:
-            w, note = watcha(f, old.get(k, {}))
+            if do_wat:
+                w, note = watcha(f, old.get(k, {}))
+            else:
+                w, note = {x: old[k][x] for x in ("w", "wid") if x in old.get(k, {})}, ""
         except CollectError as e:
             errors += 1
             log(f"왓챠 조회 실패(이전 값 유지): {f['t']} — {e}")
@@ -158,7 +169,11 @@ def main():
     for k, v in old.items():   # 이번에 조회하지 않은 작품(개봉 전, 격주 대상)은 그대로 둔다
         if k not in checked:
             new[k] = v
-    status.update(ott=new, ottAt=now_iso())
+    status["ott"] = new
+    if do_wat:
+        status["ottAt"] = now_iso()        # 화면의 'OTT 확인' 날짜는 왓챠까지 확인한 때
+    if do_nfx:
+        status["nfxAt"] = now_iso()
     save("status.json", status, depth=2)
     log(f"저장: 넷플릭스 {sum(1 for v in new.values() if v.get('n'))}편, 왓챠 구독 {sum(1 for v in new.values() if v.get('w') == 's')}편, "
         f"구매 {sum(1 for v in new.values() if v.get('w') == 'b')}편")

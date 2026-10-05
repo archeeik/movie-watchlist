@@ -6,7 +6,7 @@ on:
     - cron: "0 22 * * *"   # 매일 07:00 KST — 상영시간표 + 상영 상태(KOBIS)
     - cron: "0 8 * * 5"    # 금요일 17:00 KST — 씨네21 새 개봉작·별점
     - cron: "0 0 * * 6"    # 토요일 09:00 KST — 씨네21 새 개봉작·별점
-    - cron: "0 18 * * 0"   # 월요일 03:00 KST — OTT(넷플릭스·왓챠)
+    - cron: "0 18 * * 0"   # 월요일 03:00 KST — OTT 중 넷플릭스(왓챠는 해외 IP를 막아 PC에서 따로 돌린다)
   workflow_dispatch:
     inputs:
       what:
@@ -60,7 +60,11 @@ jobs:
           failed=""
           for s in $RUN; do
             echo "::group::$s"
-            if [ "$s" = "ott-all" ]; then python scripts/ott.py --all; else python "scripts/$s.py"; fi || failed="$failed $s"
+            case "$s" in
+              ott)     python scripts/ott.py --netflix-only ;;
+              ott-all) python scripts/ott.py --netflix-only --all ;;
+              *)       python "scripts/$s.py" ;;
+            esac || failed="$failed $s"
             echo "::endgroup::"
           done
           echo "failed=$failed" >> "$GITHUB_OUTPUT"
