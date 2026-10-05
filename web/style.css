@@ -126,3 +126,8 @@ a.tag.buy:focus-visible{outline:2px solid var(--pink);outline-offset:1px}
 @media (prefers-reduced-motion:reduce){.chev,.flash,.spin{transition:none;animation:none}}
 .linkbtn{font:inherit;color:var(--blue);background:none;border:0;padding:0;cursor:pointer;border-radius:4px}
 .seg button:focus-visible,.sechead:focus-visible,.linkbtn:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.syncform{display:flex;gap:8px;margin:0 0 10px}
+.syncform[hidden]{display:none}
+.syncform input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--label);background:var(--cell);border:.5px solid var(--sep);border-radius:9px;padding:8px 10px}
+.syncform button{font:inherit;font-size:15px;font-weight:600;color:#fff;background:var(--blue);border:0;border-radius:9px;padding:8px 14px;cursor:pointer}
+.syncform input:focus-visible,.syncform button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}

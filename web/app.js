@@ -175,7 +175,7 @@ let toastT; function toast(m,ms=3200){const t=$("#toast");t.textContent=m;t.data
    화면은 항상 이 페이지의 MINE을 기준으로 즉시 바뀐다. 기록은 이 기기의 localStorage에만 있고,
    다른 기기로는 아래 내보내기·가져오기(mine.json 파일)로 옮긴다. */
 function saveLocal(){ try{localStorage.setItem("mine",JSON.stringify(MINE));}catch(e){} }
-function saveMine(){ MINE.at=Date.now(); saveLocal(); }
+function saveMine(){ MINE.at=Date.now(); saveLocal(); if(SYNC){ clearTimeout(syncT); syncT=setTimeout(syncNow,1500); } }
 function validMine(d){ return d && typeof d.st==="object" && d.st && !Array.isArray(d.st); }
 function adoptMine(d){ MINE={st:{...d.st},rt:{...(d.rt||{})},at:d.at||Date.now()}; saveLocal(); }
 function paintMine(id){
@@ -213,6 +213,56 @@ $("#mineFile").addEventListener("change",async e=>{
   }catch(err){ toast("내 기록 파일을 읽지 못했습니다. mine.json 형식인지 확인해 주세요."); }
 });
 
+/* ---------- 기기 간 동기화: 내 GitHub 비공개 Gist에 내 기록을 저장 ----------
+   화면은 항상 이 기기의 MINE이 기준이다. 원격은 구독하지 않고, 앱을 열 때·다시 돌아올 때·기록을 바꾼 직후에만
+   한 번 받아 변경 시각(at)이 더 새로운 쪽을 따른다(원격이 새로우면 받아 오고, 이 기기가 새로우면 올린다). */
+const SYNC_FILE="movie-watchlist-mine.json";
+let SYNC=null; try{ const s=JSON.parse(localStorage.getItem("sync")||"null"); if(s&&s.token&&s.gist) SYNC=s; }catch(e){}
+let syncT=null, syncBusy=false, syncAgain=false;
+async function ghApi(path,opt={}){
+  const r=await fetch("https://api.github.com"+path,{...opt,cache:"no-store",headers:{Accept:"application/vnd.github+json",Authorization:"Bearer "+SYNC.token,...(opt.body?{"Content-Type":"application/json"}:{})}});
+  if(!r.ok){ const e=new Error("HTTP "+r.status); e.status=r.status; throw e; }
+  return r.json();
+}
+const mineDoc=()=>JSON.stringify({at:MINE.at||0,rt:MINE.rt,st:MINE.st});
+async function syncPull(){
+  const g=await ghApi("/gists/"+SYNC.gist); const f=(g.files||{})[SYNC_FILE]; if(!f) return null;
+  let text=f.content; if(f.truncated&&f.raw_url) text=await (await fetch(f.raw_url,{cache:"no-store"})).text();
+  try{ return JSON.parse(text); }catch(e){ return null; }
+}
+const syncPush=()=>ghApi("/gists/"+SYNC.gist,{method:"PATCH",body:JSON.stringify({files:{[SYNC_FILE]:{content:mineDoc()}}})});
+function syncErr(e){ return e.status===401?"토큰이 만료됐거나 올바르지 않습니다. 다시 연결해 주세요":e.status===404?"저장된 기록(Gist)을 찾지 못했습니다. 다시 연결해 주세요":e.status===403?"토큰에 Gist 권한이 없거나 요청이 너무 많습니다":"연결되지 않아 나중에 다시 시도합니다"; }
+function setSync(msg){ $("#syncState").textContent=msg; $("#syncBtn").textContent=SYNC?"해제":"설정"; if(SYNC) $("#syncForm").hidden=true; }
+async function syncNow(){
+  if(!SYNC) return; if(syncBusy){ syncAgain=true; return; } syncBusy=true; clearTimeout(syncT); syncT=null;
+  try{
+    const d=await syncPull();
+    if(validMine(d) && (d.at||0)>(MINE.at||0)){ adoptMine(d); render(); renderNow(); }
+    else if(!validMine(d) || (MINE.at||0)>(d.at||0)) await syncPush();
+    setSync(`켜짐 · ${fmtAt(Date.now())} 동기화`);
+  }catch(e){ if(SYNC) setSync("켜짐 · "+syncErr(e)); }
+  syncBusy=false; if(syncAgain){ syncAgain=false; syncNow(); }
+}
+async function syncConnect(token){
+  SYNC={token}; setSync("연결하는 중…");
+  try{
+    const list=await ghApi("/gists?per_page=100");
+    let g=list.find(x=>x.files&&x.files[SYNC_FILE]);
+    if(!g) g=await ghApi("/gists",{method:"POST",body:JSON.stringify({description:"보고싶은 영화 — 내 기록(자동 동기화)",public:false,files:{[SYNC_FILE]:{content:mineDoc()}}})});
+    SYNC.gist=g.id; try{ localStorage.setItem("sync",JSON.stringify(SYNC)); }catch(e){}
+    $("#syncToken").value=""; await syncNow(); toast("동기화를 켰습니다. 다른 기기에서도 같은 토큰으로 연결해 주세요.",5000);
+  }catch(e){ SYNC=null; setSync("꺼짐 · "+syncErr(e)); }
+}
+$("#syncBtn").addEventListener("click",()=>{
+  if(!SYNC){ const f=$("#syncForm"); f.hidden=!f.hidden; if(!f.hidden) $("#syncToken").focus(); return; }
+  if(!confirm("이 기기의 동기화를 끕니다. 하트·별점은 이 기기와 Gist에 그대로 남습니다. 계속할까요?")) return;
+  SYNC=null; clearTimeout(syncT); try{ localStorage.removeItem("sync"); }catch(e){} setSync("꺼짐");
+});
+$("#syncGo").addEventListener("click",()=>{ const v=$("#syncToken").value.trim(); if(v) syncConnect(v); });
+$("#syncToken").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#syncGo").click(); });
+document.addEventListener("visibilitychange",()=>{ if(SYNC && (document.visibilityState==="visible" || syncT)) syncNow(); });
+setSync(SYNC?"켜짐":"꺼짐");
+
 /* ---------- 시작: 데이터 불러오기 ---------- */
 async function getJSON(name){ const r=await fetch(DATA+name,{cache:"no-cache"}); if(!r.ok) throw new Error(`${name} ${r.status}`); return r.json(); }
 (async()=>{
@@ -224,6 +274,7 @@ async function getJSON(name){ const r=await fetch(DATA+name,{cache:"no-cache"});
     $("#sections").innerHTML=`<div class="group"><div class="empty">작품 정보를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요. (${esc(err.message)})</div></div>`; return;
   }
   render(); renderMeta(); renderNow();
+  syncNow();
 })();
 
 /* ---------- 홈 화면 앱(PWA): 서비스 워커 등록 ---------- */
