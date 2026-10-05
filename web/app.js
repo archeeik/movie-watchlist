@@ -142,7 +142,8 @@ function render(){
   const cmp={new:(a,b)=>(b.d||"").localeCompare(a.d||"")||b.s-a.s, old:(a,b)=>(a.d||"").localeCompare(b.d||"")||b.s-a.s, score:(a,b)=>b.s-a.s||(b.d||"").localeCompare(a.d||"")}[sortBy];
   const reCmp=sortBy==="score"?(a,b)=>b.s-a.s:(sortBy==="old"?(a,b)=>a.y-b.y:(a,b)=>b.y-a.y);
   const groups={};
-  FILMS.filter(f=>filter==="all"||fcat(f)===filter).forEach(f=>(groups[groupKey(f)]=groups[groupKey(f)]||[]).push(f));
+  // 재개봉·기획전은 상영이 끝난 작품을 목록에서 뺀다(데이터와 하트·별점은 남아 있어 다시 상영하면 돌아온다)
+  FILMS.filter(f=>!(f.re&&statusOf(f).k==="off")).filter(f=>filter==="all"||fcat(f)===filter).forEach(f=>(groups[groupKey(f)]=groups[groupKey(f)]||[]).push(f));
   let keys=Object.keys(groups).filter(k=>k!=="re").sort((a,b)=>sortBy==="old"?a.localeCompare(b):b.localeCompare(a));
   if(groups.re) keys.push("re");
   const box=$("#sections");
