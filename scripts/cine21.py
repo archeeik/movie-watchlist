@@ -2,6 +2,7 @@
 
     python scripts/cine21.py              # 별점 목록 앞 10쪽(매달 첫 실행은 45쪽 전체) + 새 작품·포스터 없는 최근작 상세
     python scripts/cine21.py --full       # 45쪽 전체
+    python scripts/cine21.py --range 2025-10-01 2025-12-31   # 지난 기간 보충: 그 기간 개봉작(6.00 이상)을 추가
     python scripts/cine21.py --posters    # 포스터 주소(p)가 없는 모든 작품의 상세도 조회(최초 1회용)
 
 별점 갱신은 개봉일이 최근 두 달 이내인 작품만 한다(그 뒤로는 별점이 바뀌지 않음).
@@ -99,6 +100,11 @@ def main():
     since = (today() - timedelta(days=NEW_DAYS)).isoformat()
     is_new = lambda d: (d + "-31")[:10] >= since   # 연도가 바뀌어도 이어지게 '올해'가 아니라 기간으로 본다
     full = "--full" in sys.argv or today().day <= 7
+    if "--range" in sys.argv:   # 지난 기간 보충: 새 작품 기준을 그 기간으로 바꾸고 전체를 훑는다
+        lo, hi = sys.argv[sys.argv.index("--range") + 1:][:2]
+        is_new = lambda d: lo <= (d + "-15")[:10] <= hi
+        full = True
+        log(f"기간 보충: {lo} ~ {hi}")
     seen = scan(PAGES_FULL if full else PAGES)
     log(f"별점 목록 {len(seen)}편 확인({'45쪽 전체' if full else '앞 10쪽'})")
 
@@ -164,6 +170,8 @@ def main():
 
     save("films.json", films, depth=1)
     save("cine21_checked.json", dict(sorted(checked.items(), key=lambda kv: int(kv[0]))), depth=1)
+    if added:
+        log("새 작품 id: " + ",".join(str(f["id"]) for f in added))
     log(f"저장: {len(films)}편(새 작품 {len(added)}편, 포스터 주소 없는 작품 {sum(1 for f in films if not f.get('p'))}편)")
 
 

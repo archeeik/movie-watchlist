@@ -2,6 +2,7 @@
 
     python scripts/ott.py          # 개봉 6개월 이내는 매번, 그 이전(재개봉·기획전 포함)은 격주(ISO 주 번호가 짝수인 주)
     python scripts/ott.py --all    # 전부 조회
+    python scripts/ott.py --ids 123,456   # 이 작품들만(새로 추가한 작품 확인용)
     python scripts/ott.py --netflix-only   # 넷플릭스만(왓챠 값은 그대로) — GitHub Actions용
     python scripts/ott.py --watcha-only    # 왓챠만(넷플릭스 값은 그대로) — 국내 PC용
 
@@ -132,6 +133,9 @@ def main():
     old_turn = "--all" in sys.argv or today().isocalendar().week % 2 == 0
     targets = [f for f in released if old_turn or recent(f)]
     do_nfx, do_wat = "--watcha-only" not in sys.argv, "--netflix-only" not in sys.argv
+    if "--ids" in sys.argv:
+        want = set(sys.argv[sys.argv.index("--ids") + 1].split(","))
+        targets = [f for f in released if str(f["id"]) in want]
     if "--limit" in sys.argv:   # 시험용: 앞의 N편만
         targets = targets[:int(sys.argv[sys.argv.index("--limit") + 1])]
     log(f"조회 대상 {len(targets)}편(개봉 6개월 이내 {sum(1 for f in released if recent(f))}편"
