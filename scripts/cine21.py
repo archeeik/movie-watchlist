@@ -1,6 +1,7 @@
-"""씨네21 전문가 별점: 별점 갱신 + 올해 개봉·6.00 이상 새 작품 추가 → data/films.json
+"""씨네21 전문가 별점: 별점 갱신 + 최근 개봉·6.00 이상 새 작품 추가 → data/films.json
 
-    python scripts/cine21.py              # 별점 목록 45쪽 + 새 작품·포스터 없는 최근작 상세
+    python scripts/cine21.py              # 별점 목록 앞 10쪽(매달 첫 실행은 45쪽 전체) + 새 작품·포스터 없는 최근작 상세
+    python scripts/cine21.py --full       # 45쪽 전체
     python scripts/cine21.py --posters    # 포스터 주소(p)가 없는 모든 작품의 상세도 조회(최초 1회용)
 
 별점 갱신은 개봉일이 최근 두 달 이내인 작품만 한다(그 뒤로는 별점이 바뀌지 않음).
@@ -16,7 +17,9 @@ from lxml import html
 from common import CollectError, fetch_text, load, log, run, save, today, ws
 
 BASE = "https://cine21.com"
-PAGES = 45
+PAGES = 10                   # 평소: 최신 리뷰순 앞쪽만(새 작품은 앞에 나온다)
+PAGES_FULL = 45              # 매달 첫 실행(1~7일)과 --full: 뒤쪽에 섞여 나온 작품까지
+NEW_DAYS = 183               # 새 작품으로 받는 범위: 개봉일이 최근 6개월 이내이거나 개봉 예정
 MIN_SCORE = 6.0
 UPDATE_DAYS = 62             # 별점 갱신 대상: 개봉일이 최근 두 달 이내(개봉 예정 포함)
 POSTER_SIZE = "[X104,150]"   # 화면 52×75의 2배
@@ -40,13 +43,13 @@ def list_page(order, p):
     return out
 
 
-def scan():
+def scan(pages):
     page = html.fromstring(fetch_text(BASE + "/movie/point"))
     order = page.xpath('//select[@id="point_list_order"]/option[1]/@value')
     if not order:
         raise CollectError("씨네21 별점 페이지에서 정렬 값(#point_list_order)을 찾지 못함")
     seen = {}
-    for p in range(1, PAGES + 1):
+    for p in range(1, pages + 1):
         items = list_page(order[0], p)
         if not items:
             if p <= 5:
@@ -54,7 +57,7 @@ def scan():
             break
         for it in items:
             seen.setdefault(it["id"], {**it, "page": p})
-    if len(seen) < 100 or sum(1 for v in seen.values() if v["s"] is not None) < len(seen) * 0.5:
+    if len(seen) < pages * 5 or sum(1 for v in seen.values() if v["s"] is not None) < len(seen) * 0.5:
         raise CollectError(f"씨네21 별점 목록을 제대로 읽지 못함({len(seen)}편)")
     return seen
 
@@ -93,9 +96,11 @@ def main():
     all_posters = "--posters" in sys.argv
     films = load("films.json")
     by_id = {f["id"]: f for f in films}
-    year = str(today().year)
-    seen = scan()
-    log(f"별점 목록 {len(seen)}편 확인")
+    since = (today() - timedelta(days=NEW_DAYS)).isoformat()
+    is_new = lambda d: (d + "-31")[:10] >= since   # 연도가 바뀌어도 이어지게 '올해'가 아니라 기간으로 본다
+    full = "--full" in sys.argv or today().day <= 7
+    seen = scan(PAGES_FULL if full else PAGES)
+    log(f"별점 목록 {len(seen)}편 확인({'45쪽 전체' if full else '앞 10쪽'})")
 
     # 1) 있던 작품: 별점만 갱신. 개봉 후 두 달이 지나면 별점이 더 바뀌지 않으므로 그대로 둔다(재개봉·기획전 그룹 포함)
     cutoff = (today() - timedelta(days=UPDATE_DAYS)).isoformat()
@@ -106,14 +111,14 @@ def main():
             log(f"별점 변경: {f['t']} {f['s']:.2f} → {it['s']:.2f}" + ("  ※ 6.00 미만(삭제하지 않음)" if it["s"] < MIN_SCORE else ""))
             f["s"] = it["s"]
 
-    # 2) 새 작품: 6.00 이상이고 올해 개봉(목록에 개봉일이 없으면 상세에서 확인)
+    # 2) 새 작품: 6.00 이상이고 최근 6개월 안에 개봉했거나 개봉 예정(목록에 개봉일이 없으면 상세에서 확인)
     # 목록에 개봉일이 없는 후보는 상세를 확인한 날을 기억해 둔다(최근 리뷰 5쪽 안이면 6일, 그 밖은 60일 뒤 재확인)
     checked = load("cine21_checked.json", {})
     added = []
     for mid, it in seen.items():
         if mid in by_id or it["s"] is None or it["s"] < MIN_SCORE:
             continue
-        if it["d"] and not it["d"].startswith(year):
+        if it["d"] and not is_new(it["d"]):
             continue
         if not it["d"]:
             last = checked.get(str(mid))
@@ -122,7 +127,7 @@ def main():
                 continue
         info = detail(mid)
         d = info.get("d") or it["d"]
-        if not d.startswith(year):
+        if not d or not is_new(d):
             if not it["d"]:
                 checked[str(mid)] = today().isoformat()
             continue

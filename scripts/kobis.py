@@ -15,14 +15,15 @@ URL = "https://www.kobis.or.kr/kobis/business/stat/boxs/findDailyBoxOfficeList.d
 def fetch_days():
     """[(날짜 'YYYY-MM-DD', {정규화 제목: 스크린 수})] 최신 날짜부터."""
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-    first = html.fromstring(fetch_text(URL, opener=opener))
+    slow = dict(timeout=90, retries=4)   # 해외 서버에서는 응답이 느리거나 끊길 때가 있다
+    first = html.fromstring(fetch_text(URL, opener=opener, **slow))
     tok = first.xpath('//form[@id="searchForm"]//input[@name="CSRFToken"]/@value')
     if not tok:
         raise CollectError("KOBIS 검색 폼에서 CSRFToken을 찾지 못함 — 구조가 바뀐 것 같음")
     end = today() - timedelta(days=1)
     form = {"CSRFToken": tok[0], "loadEnd": "0", "searchType": "search",
             "sSearchFrom": (end - timedelta(days=7)).isoformat(), "sSearchTo": end.isoformat()}
-    doc = html.fromstring(fetch_text(URL, opener=opener, data=urllib.parse.urlencode(form).encode(), headers={"Referer": URL}))
+    doc = html.fromstring(fetch_text(URL, opener=opener, data=urllib.parse.urlencode(form).encode(), headers={"Referer": URL}, **slow))
     dates = []
     for e in doc.xpath('//div[contains(@class,"board_tit")]'):
         m = re.search(r"(\d{4})년\s*(\d{2})월\s*(\d{2})일", e.text_content())
@@ -75,7 +76,7 @@ def main():
         log("새로 상영중:", ", ".join(started))
     if ended:
         log("상영중에서 빠짐:", ", ".join(ended))
-    status.update(scrDate=last_day[5:], scrAt=now_iso(), scr=scr)
+    status.update(scrDate=last_day[5:], scrDay=last_day, scrAt=now_iso(), scr=scr)
     save("status.json", status, depth=2)
 
 

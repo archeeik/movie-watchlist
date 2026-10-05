@@ -132,3 +132,12 @@ a.tag.buy:focus-visible{outline:2px solid var(--pink);outline-offset:1px}
 .syncform input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--label);background:var(--cell);border:.5px solid var(--sep);border-radius:9px;padding:8px 10px}
 .syncform button{font:inherit;font-size:15px;font-weight:600;color:#fff;background:var(--blue);border:0;border-radius:9px;padding:8px 14px;cursor:pointer}
 .syncform input:focus-visible,.syncform button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.findrow{display:flex;gap:8px;margin:0 0 10px}
+.findrow input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--label);background:var(--fill);border:0;border-radius:9px;padding:7px 10px;-webkit-appearance:none;appearance:none}
+.findrow input::placeholder{color:var(--label2)}
+.findrow button{flex:none;font:inherit;font-size:13px;font-weight:500;color:var(--label);background:var(--fill);border:0;border-radius:9px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.findrow button[aria-pressed="true"]{background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red);font-weight:600}
+.findrow input:focus-visible,.findrow button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.meta .stale{color:var(--orange);font-weight:600}
+.foot .backup{font-size:12px;color:var(--label3)}
+.foot .backup .linkbtn{color:var(--label2)}

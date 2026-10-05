@@ -41,14 +41,14 @@ def log(*a):
     print(*a, flush=True)
 
 
-def fetch(url, *, headers=None, data=None, opener=None, retries=2, pause=0.4, ok=(200, 201)):
+def fetch(url, *, headers=None, data=None, opener=None, retries=2, pause=0.4, ok=(200, 201), timeout=30):
     """GET(또는 data가 있으면 POST). 실패하면 잠깐 쉬고 다시 시도, 끝내 안 되면 CollectError."""
     h = {"User-Agent": UA, **(headers or {})}
     last = None
     for i in range(retries + 1):
         try:
             req = urllib.request.Request(url, data=data, headers=h)
-            with (opener.open if opener else urllib.request.urlopen)(req, timeout=30) as r:
+            with (opener.open if opener else urllib.request.urlopen)(req, timeout=timeout) as r:
                 body = r.read()
                 if r.status not in ok:
                     raise CollectError(f"HTTP {r.status}")

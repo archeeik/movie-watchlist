@@ -4,13 +4,16 @@ let FILMS=[];                       // data/films.json
 let state={scrDate:"",scr:{},ott:{}}; // data/status.json
 let NOW={days:{}};                  // data/showtimes.json
 
-// 내 기록: st[id] = "want"(보고 싶은 영화) | "seen"(본 영화), rt[id] = 내 별점(0.5~5, 빈 하트로 돌려도 유지)
-let MINE={st:{},rt:{}};
-try{ const s=JSON.parse(localStorage.getItem("mine")||"null"); if(s&&s.st) MINE={st:s.st,rt:s.rt||{},at:s.at||0}; }catch(e){}
+// 내 기록: st[id] = "want"(보고 싶은 영화) | "seen"(본 영화), rt[id] = 내 별점(0.5~5, 빈 하트로 돌려도 유지),
+// ts[id] = 그 영화의 기록을 마지막으로 바꾼 시각(기기 간 동기화에서 영화별로 더 새로운 쪽을 고르는 데 씀)
+let MINE={st:{},rt:{},ts:{}};
+try{ const s=JSON.parse(localStorage.getItem("mine")||"null"); if(s&&s.st) MINE={st:s.st,rt:s.rt||{},ts:s.ts||{},at:s.at||0}; }catch(e){}
 const STAR_ROW=(cls)=>`<svg class="${cls}" viewBox="0 0 110 22" aria-hidden="true">${[0,1,2,3,4].map(i=>`<path transform="translate(${i*22} 0)" d="M11 1.8l2.7 5.6 6.1.9-4.4 4.3 1 6.1L11 15.8l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>`).join("")}</svg>`;
-let sortBy="new", filter="all";
-const _n=new Date();
-const TODAY=`${_n.getFullYear()}-${String(_n.getMonth()+1).padStart(2,"0")}-${String(_n.getDate()).padStart(2,"0")}`;
+let sortBy="new", filter="all", mineOnly=false, query="";
+try{ mineOnly=localStorage.getItem("f:mine")==="1"; }catch(e){}
+const todayStr=()=>{ const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; };
+let TODAY=todayStr();   // 앱을 켜 둔 채 날짜가 바뀌면 돌아올 때 다시 정한다
+let loadedAt=0;
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
@@ -21,7 +24,7 @@ function statusOf(f){
   if(scr>0) return {k:"on",label:`상영중 ${scr.toLocaleString()}개관`};
   if(last) return {k:"part",label:`간헐 상영 · 최근 ${+last.slice(0,2)}/${+last.slice(3)}`};
   const rel=f.d&&f.d.length===10?f.d:(f.d?f.d+"-01":"");
-  const scrDay=(state.scrAt||TODAY).slice(0,4)+"-"+state.scrDate;
+  const scrDay=state.scrDay||((state.scrAt||TODAY).slice(0,4)+"-"+state.scrDate);
   if(rel && state.scrDate && rel>scrDay) return {k:"part",label:"개봉 · 상영 정보 미확인"};
   return {k:"off",label:"종영"};
 }
@@ -121,7 +124,7 @@ document.addEventListener("click",e=>{
   const dy=e.target.closest("[data-day]"); if(dy){ nowDay=dy.dataset.day; renderNow(); return; }
   const g=e.target.closest("[data-goto]");
   if(g){ const id=g.dataset.goto; let row=document.querySelector(`.row[data-id="${id}"]`);
-    if(filter!=="all"){ filter="all"; document.querySelectorAll("[data-f]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.f==="all")); render(); row=document.querySelector(`.row[data-id="${id}"]`); }
+    if(!row){ resetFilters(); render(); row=document.querySelector(`.row[data-id="${id}"]`); }
     if(row){ const sec=row.closest(".section"); if(sec&&sec.dataset.open!=="true"){ sec.dataset.open="true"; setOpen(sec.dataset.k,"true"); applyMode(sec); }
       row.hidden=false; row.scrollIntoView({behavior:"smooth",block:"center"}); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
     return; }
@@ -130,7 +133,7 @@ document.addEventListener("click",e=>{
 function groupKey(f){ if(f.re) return "re"; const [y,m]=f.d.split("-"); return `${y}-${Math.ceil(+m/3)}`; }
 function groupLabel(k){ if(k==="re") return "재개봉·기획전"; const [y,q]=k.split("-"); return `${y}년 ${q}분기`; }
 // 섹션 보기 상태: "true"(전체 펼침) → "mine"(보고 싶은·본 영화만) → "false"(접기) → 다시 전체
-function openState(k){ try{const v=localStorage.getItem("sec:"+k); if(v==="1") return "true"; if(v==="m") return "mine"; if(v==="0") return "false";}catch(e){} return k!=="re"?"true":"false"; }
+function openState(k,def){ try{const v=localStorage.getItem("sec:"+k); if(v==="1") return "true"; if(v==="m") return "mine"; if(v==="0") return "false";}catch(e){} return def; }
 function setOpen(k,v){ try{localStorage.setItem("sec:"+k,v==="true"?"1":v==="mine"?"m":"0");}catch(e){} }
 function applyMode(sec){
   const mode=sec.dataset.open, rows=[...sec.querySelectorAll(".row")];
@@ -144,26 +147,32 @@ function render(){
   const cmp={new:(a,b)=>(b.d||"").localeCompare(a.d||"")||b.s-a.s, old:(a,b)=>(a.d||"").localeCompare(b.d||"")||b.s-a.s, score:(a,b)=>b.s-a.s||(b.d||"").localeCompare(a.d||"")}[sortBy];
   const reCmp=sortBy==="score"?(a,b)=>b.s-a.s:(sortBy==="old"?(a,b)=>a.y-b.y:(a,b)=>b.y-a.y);
   const groups={};
-  // 재개봉·기획전은 상영이 끝난 작품을 목록에서 뺀다(데이터와 하트·별점은 남아 있어 다시 상영하면 돌아온다)
-  FILMS.filter(f=>!(f.re&&statusOf(f).k==="off")).filter(f=>filter==="all"||fcat(f)===filter).forEach(f=>(groups[groupKey(f)]=groups[groupKey(f)]||[]).push(f));
+  const qn=nz2(query);
+  const hit=f=>!qn||[f.t,f.q,f.dir,f.cast].some(x=>x&&nz2(x).includes(qn));
+  // 재개봉·기획전은 상영이 끝난 작품을 목록에서 뺀다(데이터와 하트·별점은 남아 있어 다시 상영하면 돌아온다). 검색할 때는 모두 찾는다
+  FILMS.filter(f=>qn||!(f.re&&statusOf(f).k==="off")).filter(f=>filter==="all"||fcat(f)===filter).filter(f=>!mineOnly||MINE.st[f.id]).filter(hit)
+    .forEach(f=>(groups[groupKey(f)]=groups[groupKey(f)]||[]).push(f));
+  // 해가 쌓여도 길어지지 않게, 따로 정해 두지 않은 섹션은 최근 4개 분기만 펼친다
+  const recent4=[...new Set(FILMS.filter(f=>!f.re).map(groupKey))].sort().reverse().slice(0,4);
   let keys=Object.keys(groups).filter(k=>k!=="re").sort((a,b)=>sortBy==="old"?a.localeCompare(b):b.localeCompare(a));
   if(groups.re) keys.push("re");
   const box=$("#sections");
-  if(!keys.length){box.innerHTML=`<div class="group"><div class="empty">이 조건에 맞는 영화가 없습니다. 다른 상태를 선택해 보세요.</div></div>`;return;}
-  box.innerHTML=keys.map(k=>{const list=groups[k].sort(k==="re"?reCmp:cmp); const open=openState(k);
+  if(!keys.length){box.innerHTML=`<div class="group"><div class="empty">이 조건에 맞는 영화가 없습니다. 검색어나 필터를 바꿔 보세요.</div></div>`;return;}
+  box.innerHTML=keys.map(k=>{const list=groups[k].sort(k==="re"?reCmp:cmp); const open=qn?"true":openState(k,recent4.includes(k)?"true":"false");
     return `<section class="section" data-k="${k}" data-open="${open}">
       <div class="headrow"><button class="sechead" aria-expanded="${open}"><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><h2>${groupLabel(k)}</h2><span class="modebadge">내 영화만</span><span class="cnt">${list.length}편</span></button></div>
       <ul class="group">${list.map(rowHTML).join("")}<li class="empty mine-empty" hidden>이 섹션에 보고 싶은 영화나 본 영화로 표시한 작품이 없습니다. 제목을 다시 누르면 접힙니다.</li></ul></section>`;}).join("");
   box.querySelectorAll(".section").forEach(applyMode);
 }
-// 마지막 갱신 시각 (자동 갱신 스크립트가 각 JSON에 남긴 시각)
+// 마지막 갱신 시각 (자동 갱신 스크립트가 각 JSON에 남긴 시각). 갱신이 오래 멈춰 있으면 주황색으로 알린다
 function renderMeta(){
   const day=s=>{ const d=new Date(s); return isNaN(d)?"":`${d.getMonth()+1}/${d.getDate()}`; };
+  const old=(s,hours)=>{ const d=new Date(s); return !isNaN(d)&&Date.now()-d>hours*3600e3; };
   const parts=[];
-  if(state.scrDate) parts.push(`상영 상태 ${+state.scrDate.slice(0,2)}/${+state.scrDate.slice(3)} 기준`);
-  if(state.ottAt) parts.push(`OTT ${day(state.ottAt)} 확인`);
-  if(NOW.at) parts.push(`시간표 ${fmtAt(NOW.at)} 갱신`);
-  $("#meta").innerHTML=parts.map(p=>`<span>${p}</span>`).join("");
+  if(state.scrDate) parts.push([`상영 상태 ${+state.scrDate.slice(0,2)}/${+state.scrDate.slice(3)} 기준`, old(state.scrAt,48)]);
+  if(state.ottAt) parts.push([`OTT ${day(state.ottAt)} 확인`, old(state.ottAt,24*10)]);
+  if(NOW.at) parts.push([`시간표 ${fmtAt(NOW.at)} 갱신`, old(NOW.at,36)]);
+  $("#meta").innerHTML=parts.map(([p,late])=>`<span${late?' class="stale" title="자동 갱신이 늦어지고 있습니다"':""}>${p}${late?" · 갱신 지연":""}</span>`).join("");
 }
 
 document.addEventListener("click",e=>{
@@ -171,6 +180,12 @@ document.addEventListener("click",e=>{
 });
 document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{sortBy=b.dataset.s;document.querySelectorAll("[data-s]").forEach(x=>x.setAttribute("aria-pressed",x===b));render();});
 document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filter=b.dataset.f;document.querySelectorAll("[data-f]").forEach(x=>x.setAttribute("aria-pressed",x===b));render();});
+/* 검색(제목·감독·배우)과 '내 영화'만 보기 */
+const paintFilters=()=>{ document.querySelectorAll("[data-f]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.f===filter)); $("#mineOnly").setAttribute("aria-pressed",mineOnly); if($("#q").value.trim()!==query) $("#q").value=query; };
+function resetFilters(){ filter="all"; mineOnly=false; query=""; try{localStorage.setItem("f:mine","0");}catch(e){} paintFilters(); }
+$("#mineOnly").addEventListener("click",()=>{ mineOnly=!mineOnly; try{localStorage.setItem("f:mine",mineOnly?"1":"0");}catch(e){} paintFilters(); render(); });
+let qT; $("#q").addEventListener("input",e=>{ query=e.target.value.trim(); clearTimeout(qT); qT=setTimeout(render,150); });
+paintFilters();
 
 let toastT; function toast(m,ms=3200){const t=$("#toast");t.textContent=m;t.dataset.show="true";clearTimeout(toastT);toastT=setTimeout(()=>t.dataset.show="false",ms);}
 
@@ -178,9 +193,20 @@ let toastT; function toast(m,ms=3200){const t=$("#toast");t.textContent=m;t.data
    화면은 항상 이 페이지의 MINE을 기준으로 즉시 바뀐다. 기록은 이 기기의 localStorage에만 있고,
    다른 기기로는 아래 내보내기·가져오기(mine.json 파일)로 옮긴다. */
 function saveLocal(){ try{localStorage.setItem("mine",JSON.stringify(MINE));}catch(e){} }
-function saveMine(){ MINE.at=Date.now(); saveLocal(); if(SYNC){ clearTimeout(syncT); syncT=setTimeout(syncNow,1500); } }
+function saveMine(id){ const now=Date.now(); MINE.at=now; if(id!=null){ MINE.ts=MINE.ts||{}; MINE.ts[id]=now; } saveLocal(); if(SYNC){ clearTimeout(syncT); syncT=setTimeout(syncNow,1500); } }
 function validMine(d){ return d && typeof d.st==="object" && d.st && !Array.isArray(d.st); }
-function adoptMine(d){ MINE={st:{...d.st},rt:{...(d.rt||{})},at:d.at||Date.now()}; saveLocal(); }
+// 파일에서 가져오기: 이 기기의 기록을 통째로 바꾼다. 바뀐 모든 영화에 지금 시각을 찍어 동기화에서도 이 내용이 이긴다
+function adoptMine(d){ const now=Date.now(), ts={};
+  new Set([...Object.keys(MINE.st),...Object.keys(MINE.rt),...Object.keys(d.st),...Object.keys(d.rt||{})]).forEach(id=>ts[id]=now);
+  MINE={st:{...d.st},rt:{...(d.rt||{})},ts,at:now}; saveLocal(); if(SYNC){ clearTimeout(syncT); syncT=setTimeout(syncNow,300); } }
+// 두 기록을 영화별로 합친다: 영화마다 변경 시각이 더 새로운 쪽을 따른다(같으면 a). ts가 없는 옛 기록은 문서 시각(at)을 쓴다
+function mineTime(d,id){ return (d.ts&&d.ts[id]) || (((d.st&&id in d.st)||(d.rt&&id in d.rt))?(d.at||1):0); }
+function mergeMine(a,b){ const out={st:{},rt:{},ts:{},at:Math.max(a.at||0,b.at||0)};
+  new Set([a,b].flatMap(d=>[...Object.keys(d.st||{}),...Object.keys(d.rt||{}),...Object.keys(d.ts||{})])).forEach(id=>{
+    const ta=mineTime(a,id), tb=mineTime(b,id), src=tb>ta?b:a, when=Math.max(ta,tb);
+    if(src.st&&src.st[id]) out.st[id]=src.st[id]; if(src.rt&&src.rt[id]) out.rt[id]=src.rt[id]; if(when) out.ts[id]=when; });
+  return out; }
+const mineKey=d=>JSON.stringify(["st","rt","ts"].map(k=>Object.entries(d[k]||{}).sort(([x],[y])=>x<y?-1:1)));
 function paintMine(id){
   try{
     const f=FILMS.find(x=>String(x.id)===String(id)); if(!f) return;
@@ -190,20 +216,20 @@ function paintMine(id){
 }
 document.addEventListener("click",e=>{
   const s=e.target.closest("[data-star]");
-  if(s){ const id=s.dataset.star; MINE.rt[id]=+s.dataset.v; paintMine(id); saveMine();
+  if(s){ const id=s.dataset.star; MINE.rt[id]=+s.dataset.v; paintMine(id); saveMine(id);
     const nb=document.querySelector(`[data-star="${id}"][data-v="${s.dataset.v}"]`); if(nb) nb.focus(); return; }
   const b=e.target.closest("[data-mine]"); if(!b) return;
   const id=b.getAttribute("data-mine"); const cur=MINE.st[id]||"";
   const next=cur===""?"want":cur==="want"?"seen":"";
   if(next) MINE.st[id]=next; else delete MINE.st[id];   // 별점(rt)은 지우지 않고 보관
   paintMine(id); try{ b.classList.remove("pop"); void b.offsetWidth; if(next) b.classList.add("pop"); }catch(err){}
-  saveMine(); renderNow();
+  saveMine(id); renderNow();
 });
 
-/* ---------- 내 기록 내보내기·가져오기 (기기 간 동기화 전까지 수동으로 옮기는 용도) ---------- */
+/* ---------- 내 기록 백업: 내보내기·가져오기 ---------- */
 $("#mineExport").addEventListener("click",()=>{
   const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([JSON.stringify({at:MINE.at||Date.now(),rt:MINE.rt,st:MINE.st})],{type:"application/json"}));
+  a.href=URL.createObjectURL(new Blob([JSON.stringify({at:MINE.at||Date.now(),rt:MINE.rt,st:MINE.st,ts:MINE.ts||{}})],{type:"application/json"}));
   a.download="mine.json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 });
 $("#mineImport").addEventListener("click",()=>$("#mineFile").click());
@@ -218,16 +244,16 @@ $("#mineFile").addEventListener("change",async e=>{
 
 /* ---------- 기기 간 동기화: 내 GitHub 비공개 Gist에 내 기록을 저장 ----------
    화면은 항상 이 기기의 MINE이 기준이다. 원격은 구독하지 않고, 앱을 열 때·다시 돌아올 때·기록을 바꾼 직후에만
-   한 번 받아 변경 시각(at)이 더 새로운 쪽을 따른다(원격이 새로우면 받아 오고, 이 기기가 새로우면 올린다). */
+   한 번 받아 영화별로 합친다(mergeMine: 영화마다 더 나중에 바꾼 쪽). 합친 결과가 다르면 이 기기와 Gist를 각각 고친다. */
 const SYNC_FILE="movie-watchlist-mine.json";
 let SYNC=null; try{ const s=JSON.parse(localStorage.getItem("sync")||"null"); if(s&&s.token&&s.gist) SYNC=s; }catch(e){}
-let syncT=null, syncBusy=false, syncAgain=false;
+let syncT=null, syncBusy=false, syncAgain=false, lastSyncErr="";
 async function ghApi(path,opt={}){
   const r=await fetch("https://api.github.com"+path,{...opt,cache:"no-store",headers:{Accept:"application/vnd.github+json",Authorization:"Bearer "+SYNC.token,...(opt.body?{"Content-Type":"application/json"}:{})}});
   if(!r.ok){ const e=new Error("HTTP "+r.status); e.status=r.status; throw e; }
   return r.json();
 }
-const mineDoc=()=>JSON.stringify({at:MINE.at||0,rt:MINE.rt,st:MINE.st});
+const mineDoc=()=>JSON.stringify({at:MINE.at||0,rt:MINE.rt,st:MINE.st,ts:MINE.ts||{}});
 async function syncPull(){
   const g=await ghApi("/gists/"+SYNC.gist); const f=(g.files||{})[SYNC_FILE]; if(!f) return null;
   let text=f.content; if(f.truncated&&f.raw_url) text=await (await fetch(f.raw_url,{cache:"no-store"})).text();
@@ -240,10 +266,13 @@ async function syncNow(){
   if(!SYNC) return; if(syncBusy){ syncAgain=true; return; } syncBusy=true; clearTimeout(syncT); syncT=null;
   try{
     const d=await syncPull();
-    if(validMine(d) && (d.at||0)>(MINE.at||0)){ adoptMine(d); render(); renderNow(); }
-    else if(!validMine(d) || (MINE.at||0)>(d.at||0)) await syncPush();
-    setSync(`켜짐 · ${fmtAt(Date.now())} 동기화`);
-  }catch(e){ if(SYNC) setSync("켜짐 · "+syncErr(e)); }
+    if(validMine(d)){
+      const m=mergeMine(MINE,d);
+      if(mineKey(m)!==mineKey(MINE)){ MINE=m; saveLocal(); render(); renderNow(); }
+      if(mineKey(m)!==mineKey(d)) await syncPush();
+    } else await syncPush();
+    lastSyncErr=""; setSync(`켜짐 · ${fmtAt(Date.now())} 동기화`);
+  }catch(e){ if(SYNC){ const m=syncErr(e); setSync("켜짐 · "+m); if(e.status&&m!==lastSyncErr) toast("동기화 오류: "+m,6000); lastSyncErr=m; } }
   syncBusy=false; if(syncAgain){ syncAgain=false; syncNow(); }
 }
 async function syncConnect(token){
@@ -268,17 +297,25 @@ setSync(SYNC?"켜짐":"꺼짐");
 
 /* ---------- 시작: 데이터 불러오기 ---------- */
 async function getJSON(name){ const r=await fetch(DATA+name,{cache:"no-cache"}); if(!r.ok) throw new Error(`${name} ${r.status}`); return r.json(); }
+async function loadData(){
+  const [films,status,shows]=await Promise.all([getJSON("films.json"),getJSON("status.json"),getJSON("showtimes.json").catch(()=>({days:{}}))]);
+  FILMS=films; state={scrDate:"",scr:{},ott:{},...status}; NOW=shows;
+  THEATERS=ALL_THEATERS.filter(([k])=>(NOW.pub||{})[k]||Object.values(NOW.days||{}).some(d=>(d[k]||[]).length));
+  loadedAt=Date.now();
+}
 (async()=>{
-  try{
-    const [films,status,shows]=await Promise.all([getJSON("films.json"),getJSON("status.json"),getJSON("showtimes.json").catch(()=>({days:{}}))]);
-    FILMS=films; state={scrDate:"",scr:{},ott:{},...status}; NOW=shows;
-    THEATERS=ALL_THEATERS.filter(([k])=>(NOW.pub||{})[k]||Object.values(NOW.days||{}).some(d=>(d[k]||[]).length));
-  }catch(err){
-    $("#sections").innerHTML=`<div class="group"><div class="empty">작품 정보를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요. (${esc(err.message)})</div></div>`; return;
-  }
+  try{ await loadData(); }
+  catch(err){ $("#sections").innerHTML=`<div class="group"><div class="empty">작품 정보를 불러오지 못했습니다. 잠시 뒤 다시 열어 주세요. (${esc(err.message)})</div></div>`; return; }
   render(); renderMeta(); renderNow();
   syncNow();
 })();
+// 앱을 켜 둔 채 다시 돌아왔을 때: 날짜가 바뀌었거나 1시간이 지났으면 데이터를 다시 받고, 현재 시각 선은 항상 다시 그린다
+document.addEventListener("visibilitychange",async()=>{
+  if(document.visibilityState!=="visible"||!loadedAt) return;
+  const dayChanged=todayStr()!==TODAY;
+  if(dayChanged||Date.now()-loadedAt>3600e3){ TODAY=todayStr(); if(dayChanged) nowDay=null; try{ await loadData(); }catch(e){} render(); renderMeta(); }
+  renderNow();
+});
 
 /* ---------- 홈 화면 앱(PWA): 서비스 워커 등록 ---------- */
 if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));

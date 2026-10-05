@@ -28,6 +28,7 @@ JW_Q = ('t%d: popularTitles(country:KR, first:3, filter:{searchQuery:%s, objectT
         'content(country:KR,language:"ko"){title originalReleaseYear} '
         'offers(country:KR,platform:WEB,filter:{packages:["nfx","nfa"]}){monetizationType}}}}}')
 CHUNK = 30
+MISS_LIMIT = 3     # 왓챠 검색에서 이 횟수만큼 연속으로 못 찾으면 내려간 것으로 보고 지운다
 RECENT_DAYS = 183   # 개봉 후 이 기간까지는 매주 조회, 그 뒤는 격주
 RERELEASE = re.compile(r"\s*(디 오리지널|4K|리마스터링|리마스터|감독판|확장판|파이널 컷|재개봉)(\s|$)")
 
@@ -80,8 +81,11 @@ def watcha(f, old):
                 hit, note = it, f"보조 판정(감독 표기 다름): {f['t']} / 씨네21 감독 {f.get('dir')} / 왓챠 '{it['subtitle']}'"
                 break
     if not hit:
-        if old.get("w"):    # 검색에서 못 찾았다고 바로 지우지 않는다
-            return {k: old[k] for k in ("w", "wid") if k in old}, f"확인 필요(이전 값 유지): {f['t']} — 왓챠 검색에서 같은 작품을 찾지 못함"
+        if old.get("w"):    # 검색에서 못 찾았다고 바로 지우지 않고, 연속으로 못 찾은 횟수(m)를 센다
+            miss = old.get("m", 0) + 1
+            if miss >= MISS_LIMIT:
+                return {}, f"왓챠에서 제거: {f['t']} — 검색에서 {miss}번 연속 찾지 못함"
+            return {**{k: old[k] for k in ("w", "wid") if k in old}, "m": miss}, f"확인 필요(이전 값 유지 {miss}/{MISS_LIMIT}): {f['t']} — 왓챠 검색에서 같은 작품을 찾지 못함"
         if movies:
             note = f"동명 영화 제외: {f['t']} ({f.get('dir')}, {f['y']}) ≠ " + " | ".join(it["subtitle"] for it in movies[:3])
         return {}, note
@@ -140,13 +144,13 @@ def main():
             if do_wat:
                 w, note = watcha(f, old.get(k, {}))
             else:
-                w, note = {x: old[k][x] for x in ("w", "wid") if x in old.get(k, {})}, ""
+                w, note = {x: old[k][x] for x in ("w", "wid", "m") if x in old.get(k, {})}, ""
         except CollectError as e:
             errors += 1
             log(f"왓챠 조회 실패(이전 값 유지): {f['t']} — {e}")
             if errors > max(5, len(targets) // 10):
                 raise CollectError("왓챠 조회 실패가 너무 많음 — 차단됐거나 구조가 바뀐 것 같음")
-            w, note = {x: old[k][x] for x in ("w", "wid", "p") if x in old.get(k, {})}, ""
+            w, note = {x: old[k][x] for x in ("w", "wid", "p", "m") if x in old.get(k, {})}, ""
         if note:
             log(note)
         o = {}
