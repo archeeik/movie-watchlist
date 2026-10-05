@@ -82,7 +82,7 @@ function renderNow(){
   const open=nowOpen(); const D=NOW.days[nowDay];
   const all=THEATERS.flatMap(([k])=>D[k]||[]);
   let h0=Math.max(8,Math.floor(Math.min(...all.map(s=>hm(s[0])),10))), h1=Math.min(26,Math.ceil(Math.max(...all.map(s=>hm(s[1])),22)));
-  const PX=74, W=(h1-h0)*PX;
+  const PX=74, W=(h1-h0)*PX, LW=52;   // LW: 왼쪽 관 이름 칸 폭(style.css의 .tlgrid와 같게)
   const wd=d=>["일","월","화","수","목","금","토"][new Date(d+"T00:00:00").getDay()];
   const lab=d=>d===TODAY?"오늘":`${+d.slice(5,7)}/${+d.slice(8)} (${wd(d)})`;
   const upd=NOW.at?`${fmtAt(NOW.at)} 기준`:"";
@@ -102,10 +102,12 @@ function renderNow(){
         const tag=f?`button type="button" data-goto="${f.id}"`:"div"; const T=esc(t), S=esc(sc);
         return `<${tag} class="${cls}" style="left:${x}px;width:${w}px" title="${a}–${b} ${T} · ${name} ${S}" aria-label="${a}부터 ${b}까지 ${T}, ${name} ${S}${st==="want"?", 보고 싶은 영화":st==="seen"?", 본 영화":""}"><b>${st==="want"?"♥ ":""}${T}</b><i>${a}–${b}</i></${tag.split(" ")[0]}>`;
       }).join("");
-      rows+=`<div class="tlh">${esc(sc)}</div><div class="trk" style="width:${W}px">${lines}${blks}</div>`;
+      // 아트관(세 예술영화관의 모든 관 + CGV 대학로 아트하우스관)은 관 이름을 파란색으로, '아트하우스' 글자는 뺀다
+      const art=k!=="cgv"||sc.includes("아트하우스");
+      rows+=`<div class="tlh${art?" art":""}"${art&&k==="cgv"?` aria-label="${esc(sc)}"`:""}>${esc(sc.replace(/\s*아트하우스/,""))}</div><div class="trk" style="width:${W}px">${lines}${blks}</div>`;
     }
   }
-  const line=nowDay===TODAY&&nowH>h0&&nowH<h1?`<div class="nowline" style="left:${92+(nowH-h0)*PX}px"></div>`:"";
+  const line=nowDay===TODAY&&nowH>h0&&nowH<h1?`<div class="nowline" style="left:${LW+(nowH-h0)*PX}px"></div>`:"";
   box.innerHTML=`<section class="section" data-k="now" data-open="${open}">
     <div class="headrow"><button class="sechead" aria-expanded="${open}"><svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><h2>상영중</h2><span class="cnt">${THEATERS.length}개 극장</span></button></div>
     <div class="group nowwrap">
