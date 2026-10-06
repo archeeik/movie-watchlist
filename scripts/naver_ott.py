@@ -2,9 +2,11 @@
 
     python scripts/naver_ott.py --sample 20     # 개봉작 중 고르게 20편을 조회해 status.json의 넷플릭스·왓챠 값과 비교
     python scripts/naver_ott.py --ids 123,456
+    python scripts/naver_ott.py --all --out naver_result.json   # 개봉작 전부, 읽은 결과를 파일로도 남김
 
 검색 결과의 영화 카드가 같은 작품인지(동명 영화)는 카드의 제작연도·감독으로 확인해 '불확실' 표시만 한다.
 """
+import json
 import re
 import sys
 import urllib.parse
@@ -51,12 +53,23 @@ def main():
     if "--ids" in sys.argv:
         want = set(sys.argv[sys.argv.index("--ids") + 1].split(","))
         targets = [f for f in released if str(f["id"]) in want]
+    elif "--all" in sys.argv:
+        targets = released
     else:
         n = int(sys.argv[sys.argv.index("--sample") + 1]) if "--sample" in sys.argv else 20
         targets = released[::max(1, len(released) // n)][:n]
     stat = {"카드 없음": 0, "불확실": 0, "넷플릭스 일치": 0, "넷플릭스 다름": 0, "왓챠 일치": 0, "왓챠 다름": 0}
+    results, failed = {}, 0
     for f in targets:
-        r = lookup(f)
+        try:
+            r = lookup(f)
+        except CollectError as e:
+            failed += 1
+            log(f"- {f['t']}: 조회 실패 — {e}")
+            if failed > max(5, len(targets) // 10):
+                raise CollectError("네이버 검색 조회 실패가 너무 많음 — 차단된 것 같음")
+            continue
+        results[str(f["id"])] = r
         o = old.get(str(f["id"]), {})
         if r is None:
             stat["카드 없음"] += 1
@@ -74,7 +87,10 @@ def main():
             f" | 지금 값 n={o.get('n', '-')} w={o.get('w', '-')}"
             + ("" if n_new == o.get("n", "") and w_new == o.get("w", "") else "  ← 다름")
             + (f" | wid {'같음' if wid and wid.group(1) == o.get('wid') else '다름'}" if wid and o.get("wid") else ""))
-    log(f"요약({len(targets)}편): " + ", ".join(f"{k} {v}" for k, v in stat.items()))
+    log(f"요약({len(targets)}편): " + ", ".join(f"{k} {v}" for k, v in stat.items()) + f", 조회 실패 {failed}")
+    if "--out" in sys.argv:
+        with open(sys.argv[sys.argv.index("--out") + 1], "w", encoding="utf-8") as fp:
+            json.dump(results, fp, ensure_ascii=False)
     if targets and stat["카드 없음"] == len(targets):
         raise CollectError("네이버 검색에서 영화 카드를 하나도 읽지 못함 — 차단됐거나 구조가 바뀐 것 같음")
 
