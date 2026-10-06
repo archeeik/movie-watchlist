@@ -147,3 +147,15 @@ h1{font-size:34px;font-weight:700;letter-spacing:.01em;margin:0 0 4px;line-heigh
 .tag.apl{background:var(--fill);color:var(--label)}
 .tag.buy{background:transparent;border:1px solid var(--label3);color:var(--label2);padding:2px 7px}
 @media (prefers-color-scheme:dark){.tag.tvi{color:#BF5AF2}.tag.wav{color:#7D7AFF}.tag.dis{color:#40C8E0}}
+.ratebtn{font-family:inherit;background:none;border:0;padding:2px 4px;margin:-2px -4px;border-radius:6px;cursor:pointer;text-decoration:underline dotted var(--label3);text-underline-offset:3px}
+.ratebtn[aria-expanded="true"]{background:var(--fill);text-decoration:none}
+.ratebtn:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.reviews{margin-top:10px;padding:10px 12px;background:var(--fill);border-radius:10px;font-size:13px;line-height:1.45}
+.reviews[hidden]{display:none}
+.reviews ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.reviews li{display:grid;gap:1px}
+.rvhead{font-size:12px;color:var(--label2);font-variant-numeric:tabular-nums}
+.rvhead b{color:var(--orange);font-weight:600}
+.rvname{margin-left:4px}
+.rvtext{color:var(--label)}
+.rvsrc{display:inline-block;margin-top:10px;font-size:12px;color:var(--label2);text-decoration:none}

@@ -3,6 +3,7 @@ const DATA="data/";
 let FILMS=[];                       // data/films.json
 let state={scrDate:"",scr:{},ott:{}}; // data/status.json
 let NOW={days:{}};                  // data/showtimes.json
+let REVIEWS={};                     // data/reviews.json: {id: [[평론가, 별점, 한줄평], ...]} — 한줄평을 받아 둔 작품만
 
 // 내 기록: st[id] = "want"(보고 싶은 영화) | "seen"(본 영화), rt[id] = 내 별점(0.5~5, 빈 하트로 돌려도 유지),
 // ts[id] = 그 영화의 기록을 마지막으로 바꾼 시각(기기 간 동기화에서 영화별로 더 새로운 쪽을 고르는 데 씀)
@@ -55,19 +56,31 @@ function rowHTML(f){
   const l2=[f.dir&&("감독 "+f.dir), f.cast, f.c, f.min&&(f.min+"분")].filter(Boolean).join(" · ");
   return `<li class="row" data-id="${f.id}">
     <div class="left">${f.p?`<img class="poster" alt="${esc(f.t)} 포스터" src="${esc(posterURL(f.p))}" width="52" height="75" loading="lazy" decoding="async" referrerpolicy="no-referrer">`:`<div class="poster"></div>`}
-      <span class="rate"><b>★</b> ${(+f.s).toFixed(2)}</span></div>
+      ${REVIEWS[f.id]?`<button class="rate ratebtn" data-reviews="${f.id}" aria-expanded="false" aria-label="${esc(f.t)} 전문가 별점 ${(+f.s).toFixed(2)}, 누르면 한줄평 ${REVIEWS[f.id].length}개 보기"><b>★</b> ${(+f.s).toFixed(2)}</button>`:`<span class="rate"><b>★</b> ${(+f.s).toFixed(2)}</span>`}</div>
     <div class="body">
       <p class="title"><a href="${naver(f)}" target="_blank" rel="noopener">${esc(f.t)}</a></p>
       <div class="l1"><span>${fmtDate(f)}</span></div>
       <div class="l2">${esc(l2)}</div>
       <div class="tags" data-status>${`<span class="tag ${st.k}">${st.label}</span>`+(st.extra?`<span class="tag">${st.extra}</span>`:"")}${ottTags(f)}</div>
       <div class="myrate" data-rate="${f.id}" ${MINE.st[f.id]==="seen"?"":"hidden"}>${rateHTML(f)}</div>
+      ${REVIEWS[f.id]?`<div class="reviews" data-rvbox="${f.id}" hidden></div>`:""}
     </div>
     <div class="acts">
       <button class="hbtn" data-mine="${f.id}" data-st="${MINE.st[f.id]||""}" aria-label="${esc(f.t)} 내 기록: ${stLabel(MINE.st[f.id])}" title="누를 때마다 보고 싶은 영화 → 본 영화 → 해제">${HEART}${SEEN}</button>
     </div></li>`;
 }
 const naver=f=>"https://search.naver.com/search.naver?query="+encodeURIComponent("영화 "+(f.q||f.t));
+// 포스터 아래 별점을 누르면 씨네21 전문가 한줄평을 펼친다(한줄평을 받아 둔 작품만)
+function reviewsHTML(id){
+  return `<ul>${REVIEWS[id].map(([name,score,text])=>`<li><span class="rvhead"><b>★</b> ${esc(score)} <span class="rvname">${esc(name)}</span></span><span class="rvtext">${esc(text)}</span></li>`).join("")}</ul>
+    <a class="rvsrc" href="https://cine21.com/movie/info/?movie_id=${encodeURIComponent(id)}" target="_blank" rel="noopener">씨네21 전문가 별점 ↗</a>`;
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-reviews]"); if(!b) return;
+  const id=b.dataset.reviews, box=document.querySelector(`[data-rvbox="${id}"]`); if(!box) return;
+  if(box.hidden&&!box.innerHTML) box.innerHTML=reviewsHTML(id);
+  box.hidden=!box.hidden; b.setAttribute("aria-expanded",!box.hidden);
+});
 // 씨네21 포스터 주소의 크기 표시 [X104,150]를 %5B…%5D로 바꾼다(대괄호가 든 주소를 못 여는 브라우저 대비)
 function posterURL(u){ return String(u).replace(/\[/g,"%5B").replace(/\]/g,"%5D"); }
 // 포스터를 불러오지 못하면 빈 칸으로
@@ -315,8 +328,8 @@ setSync(SYNC?"켜짐":"꺼짐");
 /* ---------- 시작: 데이터 불러오기 ---------- */
 async function getJSON(name){ const r=await fetch(DATA+name,{cache:"no-cache"}); if(!r.ok) throw new Error(`${name} ${r.status}`); return r.json(); }
 async function loadData(){
-  const [films,status,shows]=await Promise.all([getJSON("films.json"),getJSON("status.json"),getJSON("showtimes.json").catch(()=>({days:{}}))]);
-  FILMS=films; state={scrDate:"",scr:{},ott:{},...status}; NOW=shows;
+  const [films,status,shows,reviews]=await Promise.all([getJSON("films.json"),getJSON("status.json"),getJSON("showtimes.json").catch(()=>({days:{}})),getJSON("reviews.json").catch(()=>({}))]);
+  FILMS=films; state={scrDate:"",scr:{},ott:{},...status}; NOW=shows; REVIEWS=reviews;
   THEATERS=ALL_THEATERS.filter(([k])=>(NOW.pub||{})[k]||Object.values(NOW.days||{}).some(d=>(d[k]||[]).length));
   loadedAt=Date.now();
 }
