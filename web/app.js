@@ -34,12 +34,16 @@ function fmtDate(f){
   if(f.d.length===7) return `${+f.d.slice(0,4)}년 ${+f.d.slice(5)}월 개봉`+(isFuture(f)?" 예정":"")+(f.rr?` · ${esc(f.rr)}`:"");
   const [y,m,d]=f.d.split("-"); return `${+y}년 ${+m}월 ${+d}일 개봉`+(f.rr?` · ${esc(f.rr)}`:"")+(f.ex?" · 기준 외 추가":"");
 }
+// OTT: 구독으로 볼 수 있는 플랫폼만 이름으로 표시하고, 단품은 플랫폼과 무관하게 '구매 가능' 여부만 표시한다
+const OTT_NAMES=[["n","넷플릭스","nfx"],["w","왓챠","wac"],["t","티빙","tvi"],["v","웨이브","wav"],["d","디즈니+","dis"],["a","애플TV","apl"]];
 function ottTags(f){
   if(isFuture(f)) return `<span class="tag no">OTT 개봉 전</span>`;
-  const o=state.ott[f.id]||{}; const p=o.p?" "+esc(o.p):"";
-  const n=o.n==="s"?`<span class="tag nfx">넷플릭스</span>`:`<span class="tag no">넷플릭스 없음</span>`;
-  const w=o.w==="s"?`<span class="tag wac">왓챠 구독</span>`:o.w==="b"?(o.wid?`<a class="tag wac buy" href="https://watcha.com/contents/${encodeURIComponent(o.wid)}" target="_blank" rel="noopener" aria-label="왓챠에서 ${esc(f.t)} 구매하기">왓챠 구매${p} ↗</a>`:`<span class="tag wac">왓챠 구매${p}</span>`):`<span class="tag no">왓챠 없음</span>`;
-  return n+w;
+  const o=state.ott[f.id]||{}, s=o.s||"";
+  let h=OTT_NAMES.filter(([c])=>s.includes(c)).map(([,name,cls])=>`<span class="tag ${cls}">${name}</span>`).join("");
+  if(o.b) h+=`<span class="tag buy">단품 구매</span>`;
+  if(!h) h=`<span class="tag no">OTT 없음</span>`;
+  if(o.u) h+=`<span class="tag unk" title="제목이 같은 다른 영화의 정보일 수 있습니다">동명 주의</span>`;
+  return h;
 }
 const HEART=`<svg class="i-heart" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.4C1.5 7.8 3.6 4.5 7 4.5c2 0 3.5 1.1 5 3 1.5-1.9 3-3 5-3 3.4 0 5.5 3.3 4.3 6.6-1.8 4.8-9.3 9.4-9.3 9.4z"/></svg>`;
 const SEEN=`<svg class="i-seen" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 12.3l3 3 6-6.3"/></svg>`;

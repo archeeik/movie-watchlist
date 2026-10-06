@@ -1,4 +1,5 @@
-"""PC(국내 IP)에서 왓챠만 조회해 올린다. Windows 작업 스케줄러가 매주 실행한다.
+"""(예비용 — 지금은 쓰지 않음. 2026-10-06부터 OTT는 GitHub에서 naver_ott.py가 수집한다.)
+PC(국내 IP)에서 왓챠만 조회해 올린다. Windows 작업 스케줄러가 매주 실행한다.
 
 왓챠는 해외 IP를 막아서 GitHub Actions에서는 조회할 수 없다.
 순서: 최신 데이터 받기 → ott.py --watcha-only → status.json이 바뀌었으면 커밋·푸시(푸시하면 배포가 돈다).

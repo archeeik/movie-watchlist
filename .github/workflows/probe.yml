@@ -22,10 +22,4 @@ jobs:
       - run: pip install -r scripts/requirements.txt
       - env:
           ARGS: ${{ inputs.args }}
-        run: python scripts/naver_ott.py $ARGS --out naver_result.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: naver-result
-          path: naver_result.json
-          if-no-files-found: ignore
+        run: python scripts/naver_ott.py $ARGS --dry

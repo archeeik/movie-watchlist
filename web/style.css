@@ -109,9 +109,6 @@ h1{font-size:34px;font-weight:700;letter-spacing:.01em;margin:0 0 4px;line-heigh
 .tag.soon{background:color-mix(in srgb,var(--blue) 14%,transparent);color:var(--blue)}
 .tag.nfx{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red)}
 .tag.wac{background:color-mix(in srgb,var(--pink) 14%,transparent);color:var(--pink)}
-a.tag.buy{text-decoration:none}
-a.tag.buy:hover{background:color-mix(in srgb,var(--pink) 24%,transparent)}
-a.tag.buy:focus-visible{outline:2px solid var(--pink);outline-offset:1px}
 .tag.no{color:var(--label3);background:transparent;padding-left:2px;padding-right:2px}
 .tag.unk{background:transparent;border:1px dashed var(--label3);color:var(--label3);padding:2px 7px}
 .flash{animation:fl 1.2s ease}
@@ -144,3 +141,9 @@ a.tag.buy:focus-visible{outline:2px solid var(--pink);outline-offset:1px}
 .seg.years{margin:26px 0 -8px}
 .seg.years[hidden]{display:none}
 .seg.years button{font-size:15px;font-weight:600;padding:7px 4px;font-variant-numeric:tabular-nums}
+.tag.tvi{background:color-mix(in srgb,#AF52DE 16%,transparent);color:#AF52DE}
+.tag.wav{background:color-mix(in srgb,#5856D6 16%,transparent);color:#5856D6}
+.tag.dis{background:color-mix(in srgb,#30B0C7 18%,transparent);color:#1D8FA6}
+.tag.apl{background:var(--fill);color:var(--label)}
+.tag.buy{background:transparent;border:1px solid var(--label3);color:var(--label2);padding:2px 7px}
+@media (prefers-color-scheme:dark){.tag.tvi{color:#BF5AF2}.tag.wav{color:#7D7AFF}.tag.dis{color:#40C8E0}}

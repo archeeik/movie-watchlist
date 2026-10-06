@@ -1,4 +1,5 @@
-"""OTT: 왓챠(구독/구매, 왓챠 검색) + 넷플릭스(JustWatch) → data/status.json 의 ott, ottAt
+"""(예비용 — 지금은 쓰지 않음. 2026-10-06부터 OTT는 naver_ott.py가 수집하고 저장 형식도 다르다.)
+OTT: 왓챠(구독/구매, 왓챠 검색) + 넷플릭스(JustWatch) → data/status.json 의 ott, ottAt
 
     python scripts/ott.py          # 개봉 6개월 이내는 매번, 그 이전(재개봉·기획전 포함)은 격주(ISO 주 번호가 짝수인 주)
     python scripts/ott.py --all    # 전부 조회
