@@ -3,6 +3,7 @@
     python scripts/cine21.py              # 별점 목록 앞 10쪽(매달 첫 실행은 45쪽 전체) + 새 작품·포스터 없는 최근작 상세
     python scripts/cine21.py --full       # 45쪽 전체
     python scripts/cine21.py --range 2025-10-01 2025-12-31   # 지난 기간 보충: 그 기간 개봉작(6.00 이상)을 추가
+    python scripts/cine21.py --range 2025-07-01 2025-09-30 --pages 65   # 45쪽 너머에 있는 더 오래된 기간
     python scripts/cine21.py --posters    # 포스터 주소(p)가 없는 모든 작품의 상세도 조회(최초 1회용)
 
 별점 갱신은 개봉일이 최근 두 달 이내인 작품만 한다(그 뒤로는 별점이 바뀌지 않음).
@@ -105,8 +106,11 @@ def main():
         is_new = lambda d: lo <= (d + "-15")[:10] <= hi
         full = True
         log(f"기간 보충: {lo} ~ {hi}")
-    seen = scan(PAGES_FULL if full else PAGES)
-    log(f"별점 목록 {len(seen)}편 확인({'45쪽 전체' if full else '앞 10쪽'})")
+    pages = PAGES_FULL if full else PAGES
+    if "--pages" in sys.argv:   # 45쪽 너머(더 오래된 개봉작)까지 훑을 때
+        pages = int(sys.argv[sys.argv.index("--pages") + 1])
+    seen = scan(pages)
+    log(f"별점 목록 {len(seen)}편 확인(앞 {pages}쪽)")
 
     # 1) 있던 작품: 별점만 갱신. 개봉 후 두 달이 지나면 별점이 더 바뀌지 않으므로 그대로 둔다(재개봉·기획전 그룹 포함)
     cutoff = (today() - timedelta(days=UPDATE_DAYS)).isoformat()
