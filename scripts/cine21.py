@@ -2,7 +2,7 @@
 
     python scripts/cine21.py              # 별점 목록 앞 10쪽(매달 첫 실행은 45쪽 전체) + 새 작품·포스터 없는 최근작 상세
     python scripts/cine21.py --full       # 45쪽 전체
-    python scripts/cine21.py --reviews-only   # 목록은 훑지 않고 한줄평 대상 작품의 전문가 한줄평만 다시 받기
+    python scripts/cine21.py --reviews-only   # 목록은 훑지 않고, 한줄평 대상 중 아직 없는 작품의 전문가 한줄평만 받기(--refresh면 전부 다시)
     python scripts/cine21.py --range 2025-10-01 2025-12-31   # 지난 기간 보충: 그 기간 개봉작(6.00 이상)을 추가
     python scripts/cine21.py --range 2025-07-01 2025-09-30 --pages 65   # 45쪽 너머에 있는 더 오래된 기간
     python scripts/cine21.py --posters    # 포스터 주소(p)가 없는 모든 작품의 상세도 조회(최초 1회용)
@@ -26,7 +26,7 @@ NEW_DAYS = 183               # 새 작품으로 받는 범위: 개봉일이 최�
 MIN_SCORE = 6.0
 UPDATE_DAYS = 62             # 별점 갱신 대상: 개봉일이 최근 두 달 이내(개봉 예정 포함)
 POSTER_SIZE = "[X104,150]"   # 화면 52×75의 2배
-REVIEW_QUARTERS = {"2026-3", "2026-4"}  # 전문가 한줄평을 받아 두는 분기(개봉 연도-분기) → data/reviews.json
+REVIEW_QUARTERS = {"2026-1", "2026-2", "2026-3", "2026-4"}  # 전문가 한줄평을 받아 두는 분기(개봉 연도-분기) → data/reviews.json
 
 
 def list_page(order, p):
@@ -117,7 +117,7 @@ def main():
     reviews = load("reviews.json", {})
     if "--reviews-only" in sys.argv:
         for f in films:
-            if review_target(f):
+            if review_target(f) and (str(f["id"]) not in reviews or "--refresh" in sys.argv):   # 이미 받은 작품은 건너뛴다
                 reviews[str(f["id"])] = detail(f["id"])["rv"]
                 log(f"한줄평: {f['t']} {len(reviews[str(f['id'])])}명")
         save("reviews.json", {k: v for k, v in sorted(reviews.items(), key=lambda kv: int(kv[0])) if v}, depth=1)
