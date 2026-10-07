@@ -26,7 +26,7 @@ NEW_DAYS = 183               # 새 작품으로 받는 범위: 개봉일이 최�
 MIN_SCORE = 6.0
 UPDATE_DAYS = 62             # 별점 갱신 대상: 개봉일이 최근 두 달 이내(개봉 예정 포함)
 POSTER_SIZE = "[X104,150]"   # 화면 52×75의 2배
-REVIEW_QUARTERS = {"2026-4"}  # 전문가 한줄평을 받아 두는 분기(개봉 연도-분기) → data/reviews.json
+REVIEW_QUARTERS = {"2026-3", "2026-4"}  # 전문가 한줄평을 받아 두는 분기(개봉 연도-분기) → data/reviews.json
 
 
 def list_page(order, p):
